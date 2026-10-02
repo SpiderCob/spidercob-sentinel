@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+
+# Vendored at install/build time via scripts/fetch_rules.sh — not checked in.
+/semgrep_rules/

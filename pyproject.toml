@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spidercob-sentinel"
+version = "0.1.0"
+description = "Open-source security triage & autofix agent for startups — cuts a pile of scan findings down to the 3 that matter, in plain English"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.9"
+dependencies = [
+    "dlp-patterns>=0.4.0",
+    "osv-scan>=0.2.0",
+    "semgrep>=1.75.0",
+]
+keywords = [
+    "security", "devsecops", "sast", "secrets", "dependency-scanning",
+    "ai-agent", "startups", "vulnerability", "autofix", "ci-cd",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.optional-dependencies]
+# Bring-your-own-key LLM triage. Nothing in core scanning requires any of
+# these — the agent works fully offline/local with zero API keys, just with
+# plain severity-ranked output instead of prose explanations.
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.25.0"]
+dev = ["pytest>=7", "pytest-asyncio>=0.21"]
+
+[project.urls]
+Homepage = "https://github.com/SpiderCob/spidercob-sentinel"
+Repository = "https://github.com/SpiderCob/spidercob-sentinel"
+"Bug Tracker" = "https://github.com/SpiderCob/spidercob-sentinel/issues"
+
+[project.scripts]
+sentinel = "spidercob_sentinel.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/spidercob_sentinel"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
