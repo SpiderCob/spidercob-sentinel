@@ -37,7 +37,11 @@ classifiers = [
 # plain severity-ranked output instead of prose explanations.
 openai = ["openai>=1.0.0"]
 anthropic = ["anthropic>=0.25.0"]
-dev = ["pytest>=7", "pytest-asyncio>=0.21"]
+# Only needed to run the GitHub App webhook server (sentinel-github-app) —
+# the core scanning library and CLI stay deployable without a web server
+# or any of this.
+github-app = ["fastapi>=0.110.0", "uvicorn>=0.24.0", "pyjwt[crypto]>=2.8.0"]
+dev = ["pytest>=7", "pytest-asyncio>=0.21", "httpx>=0.27", "fastapi>=0.110.0", "pyjwt[crypto]>=2.8.0"]
 
 [project.urls]
 Homepage = "https://github.com/SpiderCob/spidercob-sentinel"
@@ -46,6 +50,7 @@ Repository = "https://github.com/SpiderCob/spidercob-sentinel"
 
 [project.scripts]
 sentinel = "spidercob_sentinel.cli:main"
+sentinel-github-app = "spidercob_sentinel.github_app:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/spidercob_sentinel"]

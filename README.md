@@ -127,15 +127,80 @@ for f in report.sorted_by_severity():
     print(f.severity, f.type, f.file, f.line, "-", f.remediation)
 ```
 
+## GitHub App: runs on every PR
+
+The webhook server (`sentinel-github-app`) runs the full scan + triage
+pipeline on every `pull_request` event, posts a Check Run and inline review
+comments, and opens an autofix PR into the PR's own branch for anything with
+a mechanical fix. There's no Spidercob-run instance of this to install from
+a marketplace — you register your own GitHub App, same as any other
+self-hosted integration.
+
+### Deploy it somewhere reachable
+
+```bash
+cp .env.example .env     # fill in after the next step
+docker compose up --build -d
+```
+
+It needs a public URL GitHub can reach for the webhook (your own domain,
+a reverse-proxied box, an ngrok tunnel for testing — anything that resolves
+to `http://localhost:8000` from the outside).
+
+### Register your own GitHub App (manifest flow — no form-filling)
+
+GitHub's [app manifest flow](https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest)
+lets you create a fully-configured app with one click instead of filling in
+a dozen fields by hand. Save this as `register.html`, replace
+`YOUR_DOMAIN_HERE`, open it in a browser while logged into GitHub, and click
+through:
+
+```html
+<!doctype html>
+<form id="f" action="https://github.com/settings/apps/new" method="post">
+  <input type="hidden" name="manifest" id="manifest">
+</form>
+<script>
+  const manifest = {
+    name: "My Spidercob Sentinel",
+    url: "https://YOUR_DOMAIN_HERE",
+    hook_attributes: { url: "https://YOUR_DOMAIN_HERE/github/webhooks" },
+    redirect_url: "https://YOUR_DOMAIN_HERE/",
+    public: false,
+    default_events: ["pull_request"],
+    default_permissions: {
+      contents: "read", pull_requests: "write", checks: "write", metadata: "read",
+    },
+  };
+  document.getElementById('manifest').value = JSON.stringify(manifest);
+  document.getElementById('f').submit();
+</script>
+```
+
+After you click "Create GitHub App" on GitHub's confirmation screen, it
+redirects to `redirect_url` with `?code=...` in the address bar. Exchange
+that code once (it's single-use) for your real credentials:
+
+```bash
+curl -s -X POST https://api.github.com/app-manifests/THE_CODE_FROM_THE_URL/conversions \
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print('GITHUB_APP_ID='+str(d['id'])); print('GITHUB_WEBHOOK_SECRET='+d['webhook_secret']); print('GITHUB_PRIVATE_KEY<<<'); print(d['pem'])"
+```
+
+Put `id` → `GITHUB_APP_ID`, `webhook_secret` → `GITHUB_WEBHOOK_SECRET`, and
+`pem` → `GITHUB_PRIVATE_KEY` (with `\n` for newlines, or your platform's
+multi-line env var syntax) into `.env`, then restart the container and
+install the app on whichever repos you want it watching (Settings → your
+app → Install App).
+
 ## Roadmap
 
 - [x] Semgrep + reachability + secrets + dependency-CVE scanning, unified
 - [x] CLI with JSON output, CI exit codes
 - [x] LLM triage layer (bring your own key)
 - [x] Deterministic autofix diffs (Semgrep `fix:` + dependency bumps)
-- [ ] GitHub App: runs on every PR, posts a Check Run + review comments,
+- [x] GitHub App: runs on every PR, posts a Check Run + review comments,
       opens autofix PRs for mechanical fixes
-- [ ] Docker image / `docker compose up` self-hosting
+- [x] Docker image / `docker compose up` self-hosting
 - [ ] Slack Q&A ("are we exposed to CVE-XXXX?")
 - [ ] Broader autofix coverage (more manifest formats)
 - [ ] Batch Semgrep invocations per language instead of one process per file

@@ -76,6 +76,37 @@ def apply_fix(content: str, finding: Finding) -> Optional[str]:
     return None
 
 
+def apply_fixes(content: str, findings: List[Finding]) -> str:
+    """Apply every fixable finding in `findings` (which must all belong to
+    the same file) to `content`, returning the final patched text.
+
+    VULNERABILITY fixes use absolute character offsets captured at scan
+    time — applying them left-to-right would invalidate every later
+    offset the moment one replacement changes the text length, so those
+    are applied in descending start_offset order (last match in the file
+    first) so earlier offsets stay valid. DEPENDENCY fixes re-locate their
+    target by package name on each call rather than a stored offset, so
+    they're order-independent and applied afterwards."""
+    vuln_findings = sorted(
+        (f for f in findings if f.category == "VULNERABILITY" and f.autofix_available),
+        key=lambda f: f.start_offset if f.start_offset is not None else -1,
+        reverse=True,
+    )
+    dep_findings = [f for f in findings if f.category == "DEPENDENCY" and f.autofix_available]
+
+    for f in vuln_findings:
+        patched = apply_semgrep_fix(content, f)
+        if patched is not None:
+            content = patched
+
+    for f in dep_findings:
+        patched = apply_dependency_fix(content, f)
+        if patched is not None:
+            content = patched
+
+    return content
+
+
 def generate_diff(original: str, patched: str, filename: str) -> str:
     return "".join(difflib.unified_diff(
         original.splitlines(keepends=True),
