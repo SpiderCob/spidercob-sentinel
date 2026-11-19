@@ -8,6 +8,8 @@ Usage:
     sentinel scan . --min-severity HIGH
     sentinel scan . --explain                      # needs SENTINEL_LLM_* env vars
     sentinel scan . --autofix-diff                  # print unified diffs, never writes files
+    sentinel check pypi requests                    # is this dependency safe to add?
+    sentinel check npm left-pad 1.3.0
 """
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ from .autofix import apply_fix, autofixable, generate_diff
 from .models import SEVERITY_RANK, Finding, ScanReport
 from .scan import scan_path
 from .triage import triage
+from .trust import check_package
 
 _SEVERITY_LABEL = {
     "CRITICAL": "CRITICAL", "HIGH": "HIGH", "MEDIUM": "MEDIUM",
@@ -118,6 +121,27 @@ def _cmd_scan(args: argparse.Namespace) -> int:
     return 1 if (args.fail_on_findings and has_blocking) else 0
 
 
+def _cmd_check(args: argparse.Namespace) -> int:
+    report = check_package(args.ecosystem, args.package, args.version)
+
+    if args.as_json:
+        print(json.dumps(report.to_dict(), indent=2))
+    else:
+        print(f"{report.package} ({report.ecosystem}, {report.version or 'version unresolved'}) — overall: {report.overall}\n")
+        if not report.found:
+            print("Could not look this package up.")
+        for s in report.signals:
+            marker = {"ok": "✓", "warning": "!", "risk": "✗", "unknown": "?"}.get(s.status, "?")
+            print(f"  [{marker}] {s.name}: {s.detail}")
+        if report.cve_findings:
+            print("\nKnown vulnerabilities:")
+            for f in report.cve_findings:
+                print(f"  [{f.severity}] {f.type} — {f.description}")
+                print(f"    Fix: {f.remediation}")
+
+    return 1 if report.overall in ("HIGH", "CRITICAL") else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="sentinel", description="Security triage & autofix agent.")
     parser.add_argument("--version", action="version", version=f"spidercob-sentinel {__version__}")
@@ -139,6 +163,13 @@ def main() -> int:
     scan_p.add_argument("--fail-on-findings", action="store_true",
                          help="Exit 1 if any non-dead-code finding at/above --min-severity was found (for CI)")
     scan_p.set_defaults(func=_cmd_scan)
+
+    check_p = sub.add_parser("check", help="Check whether a package is safe to add — no install required")
+    check_p.add_argument("ecosystem", help="pypi or npm (also accepts pip/python, node/javascript)")
+    check_p.add_argument("package", help="Package name")
+    check_p.add_argument("version", nargs="?", default=None, help="Version to check (default: latest)")
+    check_p.add_argument("--json", action="store_true", dest="as_json")
+    check_p.set_defaults(func=_cmd_check)
 
     args = parser.parse_args()
     return args.func(args)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spidercob-sentinel"
-version = "0.1.0"
+version = "0.2.0"
 description = "Open-source security triage & autofix agent for startups — cuts a pile of scan findings down to the 3 that matter, in plain English"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -12,7 +12,6 @@ requires-python = ">=3.9"
 dependencies = [
     "dlp-patterns>=0.4.0",
     "osv-scan>=0.2.0",
-    "semgrep>=1.75.0",
 ]
 keywords = [
     "security", "devsecops", "sast", "secrets", "dependency-scanning",
@@ -41,7 +40,15 @@ anthropic = ["anthropic>=0.25.0"]
 # the core scanning library and CLI stay deployable without a web server
 # or any of this.
 github-app = ["fastapi>=0.110.0", "uvicorn>=0.24.0", "pyjwt[crypto]>=2.8.0"]
-dev = ["pytest>=7", "pytest-asyncio>=0.21", "httpx>=0.27", "fastapi>=0.110.0", "pyjwt[crypto]>=2.8.0"]
+# Semgrep (scanner.py's vulnerability pass) moved out of core dependencies —
+# nothing in this package ever does `import semgrep`; scanner.py only
+# shells out to the `semgrep` *binary* via subprocess, and already handles
+# it being absent (FileNotFoundError -> [] + a warning, no crash). Pulling
+# in the real semgrep package unconditionally cost every consumer several
+# GB for a feature (trust.py's package-trust check, or just the CLI's
+# secrets-only path) that has nothing to do with it.
+scanner = ["semgrep>=1.75.0"]
+dev = ["pytest>=7", "pytest-asyncio>=0.21", "httpx>=0.27", "fastapi>=0.110.0", "pyjwt[crypto]>=2.8.0", "semgrep>=1.75.0"]
 
 [project.urls]
 Homepage = "https://github.com/SpiderCob/spidercob-sentinel"

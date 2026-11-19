@@ -48,6 +48,29 @@ each — not a textbook CWE definition, an answer to "do I need to care about
 this today." No key configured? It still works, just severity-sorted with
 no prose — nothing here requires an API key or sends your code anywhere.
 
+## Check if a package is safe to add — before you install it
+
+```bash
+sentinel check pypi requests
+sentinel check npm left-pad 1.3.0
+```
+
+No manifest file, no scan of your whole project — just "should I add this
+one dependency." Combines known CVEs (`osv-scan`) with signals the public
+registry actually exposes: package age, maintainer count, whether it runs
+code on install (`preinstall`/`install`/`postinstall` — the classic
+supply-chain vector: event-stream, ua-parser-js), and a typosquat check
+against the most-downloaded packages in the ecosystem (edit-distance 1–2
+from something like `colorama` or `requests`, while not being it, is a real
+pattern real attacks use). Rule-based, same as autofix — never an LLM
+guessing whether a supply-chain risk is real.
+
+PyPI and npm only for now; a `rust`/other-ecosystem name degrades to
+"unsupported" rather than a wrong answer. No network access needed for the
+typosquat check itself (the reference lists ship with the package); the
+registry/CVE lookups do need it and degrade to "unknown" on failure rather
+than crashing — this has to work as a quick answer, not demand a retry.
+
 ## Autofix — deliberately narrow
 
 Two sources only, both deterministic, **never LLM-generated**:
@@ -89,16 +112,24 @@ fix; it never edits files in place or opens anything on its own in v1.
 pip install spidercob-sentinel
 ```
 
-Needs the `semgrep` CLI and a one-time rule fetch:
+That's enough for `sentinel check` (package trust) and secrets/dependency
+scanning. `sentinel scan`'s vulnerability pass additionally needs the real
+`semgrep` CLI — it's an optional extra, not pulled in by default, since
+`check`/secrets/dependency-CVE scanning have nothing to do with it and
+semgrep is multi-GB with its own native deps:
 
 ```bash
+pip install "spidercob-sentinel[scanner]"
 ./scripts/fetch_rules.sh   # sparse-clones github.com/semgrep/semgrep-rules into ./semgrep_rules
 ```
 
 ## CLI
 
 ```bash
-sentinel scan <path>                 # file or directory
+sentinel check pypi requests         # is this dependency safe to add? no install needed
+sentinel check npm left-pad 1.3.0
+
+sentinel scan <path>                 # file or directory — needs the [scanner] extra above
 sentinel scan . --json
 sentinel scan . --min-severity HIGH
 sentinel scan . --explain            # needs SENTINEL_LLM_PROVIDER / SENTINEL_LLM_API_KEY
@@ -125,6 +156,15 @@ report = asyncio.run(scan_path("./my-project"))
 print(report.total, "findings,", len(report.blocking), "worth a look")
 for f in report.sorted_by_severity():
     print(f.severity, f.type, f.file, f.line, "-", f.remediation)
+```
+
+```python
+from spidercob_sentinel import check_package
+
+report = check_package("npm", "left-pad")
+print(report.overall, report.version)
+for s in report.signals:
+    print(s.status, s.name, "-", s.detail)
 ```
 
 ## GitHub App: runs on every PR
@@ -201,6 +241,9 @@ app → Install App).
 - [x] GitHub App: runs on every PR, posts a Check Run + review comments,
       opens autofix PRs for mechanical fixes
 - [x] Docker image / `docker compose up` self-hosting
+- [x] `sentinel check` — package trust check (CVEs, typosquat, maintainer/age/install-script signals), zero install required for the hosted version at spidercob.com
+- [ ] OpenSSF Scorecard integration for `sentinel check`
+- [ ] `sentinel check` for Go/crates.io/Maven (osv-scan already covers their CVEs; age/maintainer/typosquat signals aren't wired up for them yet)
 - [ ] Slack Q&A ("are we exposed to CVE-XXXX?")
 - [ ] Broader autofix coverage (more manifest formats)
 - [ ] Batch Semgrep invocations per language instead of one process per file

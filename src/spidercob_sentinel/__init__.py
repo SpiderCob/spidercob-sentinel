@@ -20,8 +20,9 @@ from .scan import scan_file, scan_path
 from .scanner import scan_code_file
 from .secrets import scan_secrets
 from .triage import TriagedFinding, TriageResult, triage
+from .trust import TrustReport, TrustSignal, check_package
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "Finding",
     "ScanReport",
@@ -31,6 +32,9 @@ __all__ = [
     "scan_secrets",
     "scan_manifest",
     "triage",
+    "check_package",
+    "TrustReport",
+    "TrustSignal",
     "TriageResult",
     "TriagedFinding",
     "apply_fix",
