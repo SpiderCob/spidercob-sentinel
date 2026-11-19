@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -110,7 +111,7 @@ class TrustReport:
 
 
 def _pypi_metadata(name: str) -> Optional[Dict[str, Any]]:
-    return _http_get_json(f"https://pypi.org/pypi/{name}/json")
+    return _http_get_json(f"https://pypi.org/pypi/{urllib.parse.quote(name, safe='')}/json")
 
 
 def _npm_metadata(name: str) -> Optional[Dict[str, Any]]:
@@ -118,7 +119,7 @@ def _npm_metadata(name: str) -> Optional[Dict[str, Any]]:
     # signal, not a transient failure, but _http_get_json collapses both
     # to None. Good enough for v1: either way we can't say anything about
     # the package, and the caller treats None as "couldn't look it up."
-    return _http_get_json(f"https://registry.npmjs.org/{name}")
+    return _http_get_json(f"https://registry.npmjs.org/{urllib.parse.quote(name, safe='')}")
 
 
 def _pypi_age_signal(meta: Dict[str, Any]) -> TrustSignal:
